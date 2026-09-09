@@ -70,12 +70,15 @@ export default function Nominations() {
     if (dupCheck?.isDuplicate) return;
     setSaving(true);
     try {
-      await nominationApi.submit({
+      const result = await nominationApi.submit({
         officerId: Number(form.officerId),
         trainingProgrammeId: Number(form.trainingProgrammeId),
         nominatingDepartmentId: Number(form.nominatingDepartmentId),
       });
-      showAlert('success', 'Nomination submitted successfully!');
+      const statusMsg = result?.status === 'WAITLISTED'
+        ? '📋 Programme is full — nomination placed on the waiting list.'
+        : '✅ Nomination confirmed successfully!';
+      showAlert('success', statusMsg);
       setShowModal(false);
       load();
     } catch (e) {
@@ -85,11 +88,18 @@ export default function Nominations() {
     }
   };
 
-  const handleCancel = async (id) => {
-    if (!confirm('Cancel this nomination?')) return;
+  const handleCancel = async (id, status) => {
+    const msg = status === 'CONFIRMED'
+      ? 'Cancel this confirmed nomination? The first person on the waiting list will be automatically promoted.'
+      : 'Remove this nomination from the waiting list?';
+    if (!confirm(msg)) return;
     try {
       await nominationApi.cancel(id);
-      showAlert('success', 'Nomination cancelled.');
+      showAlert('success',
+        status === 'CONFIRMED'
+          ? 'Nomination cancelled. Waiting list has been updated.'
+          : 'Nomination removed from the waiting list.'
+      );
       load();
     } catch (e) {
       showAlert('danger', e.message);
@@ -102,12 +112,26 @@ export default function Nominations() {
     return progMatch && deptMatch;
   });
 
+  // Returns { confirmed, total, max } for a given programme id
   const getProgrammeSeatInfo = (progId) => {
     const prog = programmes.find((p) => p.id === progId);
-    const count = nominations.filter((n) => n.trainingProgrammeId === progId).length;
     if (!prog) return null;
-    return { count, max: prog.maxParticipants };
+    const progNoms = nominations.filter((n) => n.trainingProgrammeId === progId);
+    const confirmed = progNoms.filter((n) => n.status === 'CONFIRMED').length;
+    const total = progNoms.length;
+    return { confirmed, total, max: prog.maxParticipants };
   };
+
+  // For modal: how many confirmed seats are taken for the selected programme
+  const selectedProg = form.trainingProgrammeId
+    ? programmes.find((p) => p.id === Number(form.trainingProgrammeId))
+    : null;
+  const selectedProgSeatInfo = selectedProg
+    ? getProgrammeSeatInfo(selectedProg.id)
+    : null;
+  const willBeWaitlisted =
+    selectedProgSeatInfo &&
+    selectedProgSeatInfo.confirmed >= selectedProgSeatInfo.max;
 
   return (
     <div className="page fade-in">
@@ -195,7 +219,8 @@ export default function Nominations() {
                   <th>Programme</th>
                   <th>Date</th>
                   <th>Nominating Dept</th>
-                  <th>Seats</th>
+                  <th>Status</th>
+                  <th>Seats (Confirmed)</th>
                   <th>Nominated At</th>
                   <th>Action</th>
                 </tr>
@@ -203,7 +228,8 @@ export default function Nominations() {
               <tbody>
                 {filtered.map((n) => {
                   const seatInfo = getProgrammeSeatInfo(n.trainingProgrammeId);
-                  const isFull = seatInfo && seatInfo.count >= seatInfo.max;
+                  const isConfirmed = n.status === 'CONFIRMED';
+                  const isFull = seatInfo && seatInfo.confirmed >= seatInfo.max;
                   return (
                     <tr key={n.nominationId}>
                       <td><strong>{n.officerFullName}</strong></td>
@@ -212,9 +238,18 @@ export default function Nominations() {
                       <td><span className="badge badge-blue">📅 {n.trainingDate}</span></td>
                       <td><span className="badge badge-orange">🏢 {n.nominatingDepartmentName}</span></td>
                       <td>
+                        {isConfirmed ? (
+                          <span className="badge badge-green">✅ Confirmed</span>
+                        ) : (
+                          <span className="badge badge-orange" title={`Waiting list position #${n.waitlistPosition}`}>
+                            📋 Waitlisted #{n.waitlistPosition}
+                          </span>
+                        )}
+                      </td>
+                      <td>
                         {seatInfo && (
                           <span className={`badge ${isFull ? 'badge-red' : 'badge-green'}`}>
-                            {seatInfo.count}/{seatInfo.max}
+                            {seatInfo.confirmed}/{seatInfo.max}
                           </span>
                         )}
                       </td>
@@ -224,7 +259,10 @@ export default function Nominations() {
                         </span>
                       </td>
                       <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleCancel(n.nominationId)}>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleCancel(n.nominationId, n.status)}
+                        >
                           Cancel
                         </button>
                       </td>
@@ -291,6 +329,21 @@ export default function Nominations() {
               </div>
             </div>
 
+            {/* Capacity / waitlist info banner */}
+            {selectedProg && selectedProgSeatInfo && !dupCheck?.isDuplicate && (
+              willBeWaitlisted ? (
+                <div className="alert alert-info" style={{ marginBottom: 12 }}>
+                  📋 <strong>{selectedProg.title}</strong> is at full capacity ({selectedProgSeatInfo.confirmed}/{selectedProgSeatInfo.max} confirmed).
+                  This nomination will be placed on the <strong>waiting list</strong> and automatically confirmed if a seat becomes available.
+                </div>
+              ) : (
+                <div className="alert alert-success" style={{ marginBottom: 12 }}>
+                  🪑 <strong>{selectedProgSeatInfo.confirmed}/{selectedProgSeatInfo.max}</strong> seats confirmed —
+                  this nomination will be <strong>confirmed immediately</strong>.
+                </div>
+              )
+            )}
+
             {/* Duplicate Check Result */}
             {dupCheck?.checking && (
               <div className="alert alert-info">🔍 Checking for duplicates…</div>
@@ -326,7 +379,7 @@ export default function Nominations() {
                   dupCheck?.checking
                 }
               >
-                {saving ? 'Submitting…' : '✅ Submit Nomination'}
+                {saving ? 'Submitting…' : willBeWaitlisted ? '📋 Add to Waiting List' : '✅ Confirm Nomination'}
               </button>
             </div>
           </div>

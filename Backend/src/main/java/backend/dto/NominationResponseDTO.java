@@ -22,4 +22,9 @@ public class NominationResponseDTO {
     private Long nominatingDepartmentId;
     private String nominatingDepartmentName;
     private LocalDateTime nominatedAt;
+    /** "CONFIRMED" or "WAITLISTED" */
+    private String status;
+    /** 1-based position in the waiting list; null when status is CONFIRMED */
+    private Integer waitlistPosition;
 }
+

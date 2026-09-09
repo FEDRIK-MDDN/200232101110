@@ -45,4 +45,13 @@ public class Nomination {
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime nominatedAt = LocalDateTime.now();
+
+    /**
+     * Whether this nomination is confirmed (within capacity) or on the waiting list.
+     * Stored as a plain VARCHAR so it is human-readable in the DB.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private NominationStatus status = NominationStatus.CONFIRMED;
 }
