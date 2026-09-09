@@ -75,7 +75,8 @@ export default function App() {
           color: 'var(--text-dim)',
           lineHeight: 1.6
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>Task 1 — Duplicate Nominations</div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Task 1 — Duplicate Prevention</div>
+          <div style={{ fontWeight: 600, marginBottom: 2, marginTop: 4 }}>Task 2 — Capacity &amp; Waitlist</div>
           <div>Spring Boot + React</div>
         </div>
       </aside>
@@ -86,7 +87,7 @@ export default function App() {
           <div className="topbar-title">
             {NAV.find((n) => n.id === page)?.icon}&nbsp;{PAGE_TITLES[page]}
           </div>
-          <span className="topbar-badge">🛡️ Duplicate Prevention Active</span>
+          <span className="topbar-badge">🛡️ Task 1 &amp; 2 Active</span>
         </header>
 
         <main>{renderPage()}</main>

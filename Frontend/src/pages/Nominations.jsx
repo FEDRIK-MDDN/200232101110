@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import { nominationApi, officerApi, programmeApi, departmentApi } from '../api';
 
+// Safely parse a nominatedAt value that may be an ISO string or a Java LocalDateTime array
+const parseNominatedAt = (val) => {
+  if (!val) return null;
+  if (Array.isArray(val)) {
+    // Java array: [year, month, day, hour, minute, second, nano?]
+    const [y, mo, d, h = 0, mi = 0, s = 0] = val;
+    return new Date(y, mo - 1, d, h, mi, s);
+  }
+  return new Date(val);
+};
+
 export default function Nominations() {
   const [nominations, setNominations] = useState([]);
   const [officers, setOfficers] = useState([]);
@@ -133,11 +144,108 @@ export default function Nominations() {
     selectedProgSeatInfo &&
     selectedProgSeatInfo.confirmed >= selectedProgSeatInfo.max;
 
+  // Split filtered into confirmed and waitlisted for Task 2 presentation
+  const filteredConfirmed = filtered.filter((n) => n.status === 'CONFIRMED');
+  const filteredWaitlisted = filtered
+    .filter((n) => n.status === 'WAITLISTED')
+    .sort((a, b) => (a.waitlistPosition ?? 999) - (b.waitlistPosition ?? 999));
+
+  // Shared nomination row renderer
+  const renderRow = (n) => {
+    const seatInfo = getProgrammeSeatInfo(n.trainingProgrammeId);
+    const isFull = seatInfo && seatInfo.confirmed >= seatInfo.max;
+    return (
+      <tr key={n.nominationId}>
+        <td><strong>{n.officerFullName}</strong></td>
+        <td><span className="badge badge-blue">{n.officerEmployeeId}</span></td>
+        <td>{n.trainingProgrammeTitle}</td>
+        <td><span className="badge badge-blue">📅 {n.trainingDate}</span></td>
+        <td><span className="badge badge-orange">🏢 {n.nominatingDepartmentName}</span></td>
+        <td>
+          {n.status === 'CONFIRMED' ? (
+            <span className="badge badge-green">✅ Confirmed</span>
+          ) : (
+            <span className="badge badge-orange" title={`Waiting list position #${n.waitlistPosition}`}>
+              📋 #{n.waitlistPosition}
+            </span>
+          )}
+        </td>
+        <td>
+          {seatInfo && (
+            <span className={`badge ${isFull ? 'badge-red' : 'badge-green'}`}>
+              {seatInfo.confirmed}/{seatInfo.max}
+            </span>
+          )}
+        </td>
+        <td>
+          <span className="text-muted text-sm">
+            {parseNominatedAt(n.nominatedAt)
+              ? parseNominatedAt(n.nominatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+              : '—'}
+          </span>
+        </td>
+        <td>
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={() => handleCancel(n.nominationId, n.status)}
+          >
+            Cancel
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="page fade-in">
       {alert && (
         <div className={`alert alert-${alert.type}`}>
           {alert.type === 'success' ? '✅' : '❌'} {alert.msg}
+        </div>
+      )}
+
+      {/* ── Task 2 Stats Summary Bar ── */}
+      {!loading && nominations.length > 0 && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{
+            flex: 1, minWidth: 140, background: 'rgba(16,185,129,0.1)',
+            border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10,
+            padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <span style={{ fontSize: 26 }}>✅</span>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--success)' }}>
+                {nominations.filter((n) => n.status === 'CONFIRMED').length}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>CONFIRMED</div>
+            </div>
+          </div>
+          <div style={{
+            flex: 1, minWidth: 140, background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.3)', borderRadius: 10,
+            padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <span style={{ fontSize: 26 }}>📋</span>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--warning)' }}>
+                {nominations.filter((n) => n.status === 'WAITLISTED').length}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>WAITLISTED</div>
+            </div>
+          </div>
+          <div style={{
+            flex: 1, minWidth: 140, background: 'rgba(79,70,229,0.1)',
+            border: '1px solid rgba(79,70,229,0.3)', borderRadius: 10,
+            padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <span style={{ fontSize: 26 }}>📚</span>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary-light)' }}>
+                {nominations.length}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -210,67 +318,143 @@ export default function Nominations() {
             <p>No nominations found.</p>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Officer</th>
-                  <th>Employee ID</th>
-                  <th>Programme</th>
-                  <th>Date</th>
-                  <th>Nominating Dept</th>
-                  <th>Status</th>
-                  <th>Seats (Confirmed)</th>
-                  <th>Nominated At</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((n) => {
-                  const seatInfo = getProgrammeSeatInfo(n.trainingProgrammeId);
-                  const isConfirmed = n.status === 'CONFIRMED';
-                  const isFull = seatInfo && seatInfo.confirmed >= seatInfo.max;
-                  return (
-                    <tr key={n.nominationId}>
-                      <td><strong>{n.officerFullName}</strong></td>
-                      <td><span className="badge badge-blue">{n.officerEmployeeId}</span></td>
-                      <td>{n.trainingProgrammeTitle}</td>
-                      <td><span className="badge badge-blue">📅 {n.trainingDate}</span></td>
-                      <td><span className="badge badge-orange">🏢 {n.nominatingDepartmentName}</span></td>
-                      <td>
-                        {isConfirmed ? (
-                          <span className="badge badge-green">✅ Confirmed</span>
-                        ) : (
-                          <span className="badge badge-orange" title={`Waiting list position #${n.waitlistPosition}`}>
-                            📋 Waitlisted #{n.waitlistPosition}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {seatInfo && (
-                          <span className={`badge ${isFull ? 'badge-red' : 'badge-green'}`}>
-                            {seatInfo.confirmed}/{seatInfo.max}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="text-muted text-sm">
-                          {new Date(n.nominatedAt).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleCancel(n.nominationId, n.status)}
-                        >
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+            {/* ✅ Confirmed Nominations */}
+            {filteredConfirmed.length > 0 && (
+              <div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  marginBottom: 10, padding: '6px 10px',
+                  background: 'rgba(16,185,129,0.08)',
+                  border: '1px solid rgba(16,185,129,0.25)',
+                  borderRadius: 8
+                }}>
+                  <span style={{ fontSize: 16 }}>✅</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--success)' }}>
+                    Confirmed Participants
+                  </span>
+                  <span className="badge badge-green" style={{ marginLeft: 'auto' }}>
+                    {filteredConfirmed.length} confirmed
+                  </span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Officer</th>
+                        <th>Employee ID</th>
+                        <th>Programme</th>
+                        <th>Training Date</th>
+                        <th>Nominating Dept</th>
+                        <th>Status</th>
+                        <th>Seats Used</th>
+                        <th>Nominated At</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>{filteredConfirmed.map(renderRow)}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 📋 Waiting List */}
+            {filteredWaitlisted.length > 0 && (
+              <div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  marginBottom: 10, padding: '6px 10px',
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.25)',
+                  borderRadius: 8
+                }}>
+                  <span style={{ fontSize: 16 }}>📋</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--warning)' }}>
+                    Waiting List
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>
+                    — ordered by submission time (first in, first out)
+                  </span>
+                  <span className="badge badge-orange" style={{ marginLeft: 'auto' }}>
+                    {filteredWaitlisted.length} waiting
+                  </span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Officer</th>
+                        <th>Employee ID</th>
+                        <th>Programme</th>
+                        <th>Training Date</th>
+                        <th>Nominating Dept</th>
+                        <th>Status</th>
+                        <th>Seats Used</th>
+                        <th>Nominated At</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredWaitlisted.map((n) => {
+                        const seatInfo = getProgrammeSeatInfo(n.trainingProgrammeId);
+                        return (
+                          <tr key={n.nominationId}>
+                            <td>
+                              <span style={{
+                                fontWeight: 800, fontSize: 16,
+                                color: n.waitlistPosition === 1 ? 'var(--warning)' : 'var(--text-muted)'
+                              }}>
+                                #{n.waitlistPosition}
+                              </span>
+                            </td>
+                            <td><strong>{n.officerFullName}</strong></td>
+                            <td><span className="badge badge-blue">{n.officerEmployeeId}</span></td>
+                            <td>{n.trainingProgrammeTitle}</td>
+                            <td><span className="badge badge-blue">📅 {n.trainingDate}</span></td>
+                            <td><span className="badge badge-orange">🏢 {n.nominatingDepartmentName}</span></td>
+                            <td>
+                              <span className="badge badge-orange">
+                                📋 Waitlisted #{n.waitlistPosition}
+                              </span>
+                              {n.waitlistPosition === 1 && (
+                                <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--warning)', fontWeight: 600 }}>
+                                  ⬆️ Next up
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {seatInfo && (
+                                <span className="badge badge-red">
+                                  FULL {seatInfo.confirmed}/{seatInfo.max}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="text-muted text-sm">
+                                {parseNominatedAt(n.nominatedAt)
+                                  ? parseNominatedAt(n.nominatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                                  : '—'}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleCancel(n.nominationId, n.status)}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
       </div>

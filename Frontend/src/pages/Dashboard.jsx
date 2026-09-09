@@ -96,17 +96,19 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {nominations.map((n) => (
-                <div key={n.nominationId} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', background: 'var(--bg)', borderRadius: 8,
-                  border: '1px solid var(--border)'
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{n.officerFullName}</div>
-                    <div className="text-muted" style={{ fontSize: 12 }}>{n.trainingProgrammeTitle}</div>
+                  <div key={n.nominationId} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px', background: 'var(--bg)', borderRadius: 8,
+                    border: '1px solid var(--border)'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{n.officerFullName}</div>
+                      <div className="text-muted" style={{ fontSize: 12 }}>{n.trainingProgrammeTitle}</div>
+                    </div>
+                    <span className={`badge ${n.status === 'CONFIRMED' ? 'badge-green' : 'badge-orange'}`}>
+                      {n.status === 'CONFIRMED' ? '✅ Confirmed' : `📋 Waitlisted #${n.waitlistPosition}`}
+                    </span>
                   </div>
-                  <span className="badge badge-orange">{n.nominatingDepartmentName}</span>
-                </div>
               ))}
             </div>
           )}
@@ -142,12 +144,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* How Duplicate Prevention Works */}
+      {/* How Duplicate Prevention Works — Task 1 */}
       <div className="card mt-4" style={{
         background: 'rgba(16,185,129,0.05)',
         border: '1px solid rgba(16,185,129,0.2)'
       }}>
-        <h3 className="card-title mb-4">🛡️ Duplicate Nomination Prevention</h3>
+        <h3 className="card-title mb-4">🛡️ Task 1 — Duplicate Nomination Prevention</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {[
             { icon: '🔍', title: 'Real-time Check', desc: 'System checks for duplicates instantly as you select an officer and programme.' },
@@ -156,6 +158,45 @@ export default function Dashboard() {
           ].map((item) => (
             <div key={item.title} style={{
               padding: '16px', background: 'var(--bg)', borderRadius: 10,
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{item.icon}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{item.title}</div>
+              <p className="text-muted" style={{ fontSize: 12, lineHeight: 1.5 }}>{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Task 2 — Limited Training Capacity */}
+      <div className="card mt-4" style={{
+        background: 'rgba(6,182,212,0.05)',
+        border: '1px solid rgba(6,182,212,0.2)'
+      }}>
+        <h3 className="card-title mb-4">📋 Task 2 — Limited Training Capacity &amp; Waiting List</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {[
+            {
+              icon: '🦧',
+              title: 'Capacity Enforcement',
+              desc: 'When confirmed seats reach the programme maximum, new nominations are automatically placed on a waiting list instead of being rejected.',
+              color: 'rgba(6,182,212,0.15)',
+            },
+            {
+              icon: '📊',
+              title: 'Ordered Waiting List',
+              desc: 'Waitlisted nominees are ranked by the time their nomination was received (first come, first served). Each person sees their exact queue position.',
+              color: 'rgba(245,158,11,0.15)',
+            },
+            {
+              icon: '⬆️',
+              title: 'Auto-Promotion',
+              desc: 'If a confirmed participant cancels, the system automatically promotes the first person on the waiting list to confirmed status.',
+              color: 'rgba(16,185,129,0.15)',
+            },
+          ].map((item) => (
+            <div key={item.title} style={{
+              padding: '16px', background: item.color, borderRadius: 10,
               border: '1px solid var(--border)'
             }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>{item.icon}</div>

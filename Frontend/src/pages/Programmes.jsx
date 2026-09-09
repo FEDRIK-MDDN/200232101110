@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { programmeApi, departmentApi } from '../api';
+import { programmeApi, departmentApi, nominationApi } from '../api';
 
 export default function Programmes() {
   const [programmes, setProgrammes] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editProg, setEditProg] = useState(null);
@@ -19,14 +20,25 @@ export default function Programmes() {
   const load = async () => {
     try {
       setLoading(true);
-      const [p, d] = await Promise.all([programmeApi.getAll(), departmentApi.getAll()]);
+      const [p, d, n] = await Promise.all([programmeApi.getAll(), departmentApi.getAll(), nominationApi.getAll()]);
       setProgrammes(p || []);
       setDepartments(d || []);
+      setNominations(n || []);
     } catch (e) {
       showAlert('danger', e.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate capacity info for a programme
+  const getSeatInfo = (progId, maxParticipants) => {
+    const progNoms = nominations.filter((n) => n.trainingProgrammeId === progId);
+    const confirmed = progNoms.filter((n) => n.status === 'CONFIRMED').length;
+    const waitlisted = progNoms.filter((n) => n.status === 'WAITLISTED').length;
+    const pct = maxParticipants > 0 ? Math.min((confirmed / maxParticipants) * 100, 100) : 0;
+    const isFull = confirmed >= maxParticipants;
+    return { confirmed, waitlisted, pct, isFull };
   };
 
   useEffect(() => { load(); }, []);
@@ -126,7 +138,7 @@ export default function Programmes() {
                   <th>Date</th>
                   <th>Venue</th>
                   <th>Trainer</th>
-                  <th>Max</th>
+                  <th>Capacity</th>
                   <th>Target Depts</th>
                   <th>Actions</th>
                 </tr>
@@ -139,7 +151,38 @@ export default function Programmes() {
                     <td><span className="text-muted">📍 {p.venue}</span></td>
                     <td>{p.trainerName}</td>
                     <td>
-                      <span className="badge badge-green">{p.maxParticipants} seats</span>
+                      {(() => {
+                        const { confirmed, waitlisted, pct, isFull } = getSeatInfo(p.id, p.maxParticipants);
+                        return (
+                          <div style={{ minWidth: 160 }}>
+                            {/* Progress bar */}
+                            <div style={{
+                              background: 'var(--bg)', borderRadius: 6, height: 8,
+                              overflow: 'hidden', marginBottom: 6,
+                              border: '1px solid var(--border)'
+                            }}>
+                              <div style={{
+                                width: `${pct}%`, height: '100%', borderRadius: 6,
+                                background: isFull
+                                  ? 'linear-gradient(90deg, var(--danger), var(--danger-light))'
+                                  : 'linear-gradient(90deg, var(--success), var(--success-light))',
+                                transition: 'width 0.4s ease'
+                              }} />
+                            </div>
+                            {/* Counts */}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <span className={`badge ${isFull ? 'badge-red' : 'badge-green'}`}>
+                                ✅ {confirmed}/{p.maxParticipants}
+                              </span>
+                              {waitlisted > 0 && (
+                                <span className="badge badge-orange">
+                                  📋 {waitlisted} waiting
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>
                       <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
