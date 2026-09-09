@@ -44,10 +44,14 @@ public class OfficerService {
         existing.setFullName(updated.getFullName());
         existing.setEmail(updated.getEmail());
         existing.setEmployeeId(updated.getEmployeeId());
+        existing.setGrade(updated.getGrade());
+        existing.setYearsOfService(updated.getYearsOfService());
         if (updated.getDepartment() != null && updated.getDepartment().getId() != null) {
             Department dept = departmentRepository.findById(updated.getDepartment().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department", updated.getDepartment().getId()));
             existing.setDepartment(dept);
+        } else {
+            existing.setDepartment(null);
         }
         return officerRepository.save(existing);
     }
