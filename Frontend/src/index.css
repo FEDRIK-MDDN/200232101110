@@ -316,6 +316,40 @@ select option {
   color: var(--text);
 }
 
+/* ── Form Validation ── */
+input.input-error, select.input-error, textarea.input-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.field-error {
+  font-size: 12px;
+  color: var(--danger-light);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  animation: fadeIn 0.2s ease;
+}
+
+.field-error::before {
+  content: '⚠';
+  font-size: 11px;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+.form-shake {
+  animation: shake 0.35s ease;
+}
+
 /* ── Buttons ── */
 .btn {
   display: inline-flex;
