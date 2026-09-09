@@ -1,61 +1,67 @@
-// Central API service - all backend calls in one place
-const BASE_URL = 'http://localhost:8080/api';
+import axios from 'axios';
 
-async function request(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.message || 'Request failed');
+// ── Axios instance ────────────────────────────────
+const api = axios.create({
+  baseURL: 'http://localhost:8080/api',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Response interceptor — unwrap data or throw a readable error
+api.interceptors.response.use(
+  (res) => res.data.data,          // unwrap: { success, data } → data
+  (err) => {
+    const msg =
+      err.response?.data?.message || // backend error message
+      err.message ||                  // axios/network error
+      'Request failed';
+    return Promise.reject(new Error(msg));
   }
-  return json.data;
-}
+);
 
 // ── Departments ──────────────────────────────────
 export const departmentApi = {
-  getAll: () => request('/departments'),
-  create: (data) => request('/departments', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) => request(`/departments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id) => request(`/departments/${id}`, { method: 'DELETE' }),
+  getAll:         ()         => api.get('/departments'),
+  create:         (data)     => api.post('/departments', data),
+  update:         (id, data) => api.put(`/departments/${id}`, data),
+  delete:         (id)       => api.delete(`/departments/${id}`),
 };
 
 // ── Officers ─────────────────────────────────────
 export const officerApi = {
-  getAll: () => request('/officers'),
-  getById: (id) => request(`/officers/${id}`),
-  create: (data) => request('/officers', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) => request(`/officers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id) => request(`/officers/${id}`, { method: 'DELETE' }),
+  getAll:   ()         => api.get('/officers'),
+  getById:  (id)       => api.get(`/officers/${id}`),
+  create:   (data)     => api.post('/officers', data),
+  update:   (id, data) => api.put(`/officers/${id}`, data),
+  delete:   (id)       => api.delete(`/officers/${id}`),
 };
 
 // ── Training Programmes ───────────────────────────
 export const programmeApi = {
-  getAll: () => request('/programmes'),
-  getById: (id) => request(`/programmes/${id}`),
-  create: (data, departmentIds) => {
+  getAll:   ()         => api.get('/programmes'),
+  getById:  (id)       => api.get(`/programmes/${id}`),
+  create:   (data, departmentIds) => {
     const params = departmentIds?.length
-      ? '?' + departmentIds.map((id) => `departmentIds=${id}`).join('&')
-      : '';
-    return request(`/programmes${params}`, { method: 'POST', body: JSON.stringify(data) });
+      ? { params: new URLSearchParams(departmentIds.map((id) => ['departmentIds', id])) }
+      : {};
+    return api.post('/programmes', data, params);
   },
-  update: (id, data, departmentIds) => {
+  update:   (id, data, departmentIds) => {
     const params = departmentIds?.length
-      ? '?' + departmentIds.map((did) => `departmentIds=${did}`).join('&')
-      : '';
-    return request(`/programmes/${id}${params}`, { method: 'PUT', body: JSON.stringify(data) });
+      ? { params: new URLSearchParams(departmentIds.map((did) => ['departmentIds', did])) }
+      : {};
+    return api.put(`/programmes/${id}`, data, params);
   },
-  delete: (id) => request(`/programmes/${id}`, { method: 'DELETE' }),
+  delete:   (id)       => api.delete(`/programmes/${id}`),
 };
 
 // ── Nominations ───────────────────────────────────
 export const nominationApi = {
-  getAll: () => request('/nominations'),
-  getByProgramme: (programmeId) => request(`/nominations/programme/${programmeId}`),
-  getByOfficer: (officerId) => request(`/nominations/officer/${officerId}`),
-  checkDuplicate: (officerId, programmeId) =>
-    request(`/nominations/check-duplicate?officerId=${officerId}&programmeId=${programmeId}`),
-  submit: (data) => request('/nominations', { method: 'POST', body: JSON.stringify(data) }),
-  cancel: (id) => request(`/nominations/${id}`, { method: 'DELETE' }),
+  getAll:          ()                       => api.get('/nominations'),
+  getByProgramme:  (programmeId)            => api.get(`/nominations/programme/${programmeId}`),
+  getByOfficer:    (officerId)              => api.get(`/nominations/officer/${officerId}`),
+  checkDuplicate:  (officerId, programmeId) =>
+    api.get('/nominations/check-duplicate', { params: { officerId, programmeId } }),
+  submit:          (data)                   => api.post('/nominations', data),
+  cancel:          (id)                     => api.delete(`/nominations/${id}`),
 };
+
