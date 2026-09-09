@@ -30,4 +30,18 @@ public class Officer {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "department_id")
     private Department department;
+
+    /**
+     * Task 3 — officer's grade/designation (e.g. "Grade 3", "Senior Executive").
+     * Used by GRADE_REQUIREMENT eligibility rules.
+     */
+    @Column(length = 100)
+    private String grade;
+
+    /**
+     * Task 3 — number of completed years of service.
+     * Used by MIN_YEARS_OF_SERVICE eligibility rules.
+     */
+    @Column
+    private Integer yearsOfService;
 }

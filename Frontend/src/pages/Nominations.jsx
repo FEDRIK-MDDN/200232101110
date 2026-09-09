@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { nominationApi, officerApi, programmeApi, departmentApi } from '../api';
+import { nominationApi, officerApi, programmeApi, departmentApi, eligibilityApi } from '../api';
 
 // Safely parse a nominatedAt value that may be an ISO string or a Java LocalDateTime array
 const parseNominatedAt = (val) => {
@@ -26,6 +26,9 @@ export default function Nominations() {
 
   // Duplicate check state
   const [dupCheck, setDupCheck] = useState(null); // null | { isDuplicate, checking }
+
+  // Task 3: Eligibility check state
+  const [eligCheck, setEligCheck] = useState(null); // null | { checking, eligible, violations[] }
 
   const [form, setForm] = useState({
     officerId: '', trainingProgrammeId: '', nominatingDepartmentId: ''
@@ -65,6 +68,18 @@ export default function Nominations() {
     }
   }, [form.officerId, form.trainingProgrammeId]);
 
+  // Task 3: Auto eligibility check whenever officer + programme are both selected
+  useEffect(() => {
+    if (form.officerId && form.trainingProgrammeId) {
+      setEligCheck({ checking: true });
+      eligibilityApi.check(form.officerId, form.trainingProgrammeId)
+        .then((data) => setEligCheck({ checking: false, eligible: data.eligible, violations: data.violations }))
+        .catch(() => setEligCheck(null));
+    } else {
+      setEligCheck(null);
+    }
+  }, [form.officerId, form.trainingProgrammeId]);
+
   const showAlert = (type, msg) => {
     setAlert({ type, msg });
     setTimeout(() => setAlert(null), 5000);
@@ -73,12 +88,14 @@ export default function Nominations() {
   const openModal = () => {
     setForm({ officerId: '', trainingProgrammeId: '', nominatingDepartmentId: '' });
     setDupCheck(null);
+    setEligCheck(null);
     setShowModal(true);
   };
 
   const handleSubmit = async () => {
     if (!form.officerId || !form.trainingProgrammeId || !form.nominatingDepartmentId) return;
     if (dupCheck?.isDuplicate) return;
+    if (eligCheck && !eligCheck.eligible) return;
     setSaving(true);
     try {
       const result = await nominationApi.submit({
@@ -548,6 +565,40 @@ export default function Nominations() {
               </div>
             )}
 
+            {/* Task 3: Eligibility Check Results */}
+            {eligCheck?.checking && (
+              <div className="alert alert-info">🔍 Checking eligibility rules…</div>
+            )}
+            {eligCheck && !eligCheck.checking && !eligCheck.eligible && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: 10, padding: 16, marginBottom: 12
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 22 }}>⛔</span>
+                  <span style={{ fontWeight: 700, color: '#f87171', fontSize: 15 }}>
+                    Eligibility Requirements Not Met
+                  </span>
+                </div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {eligCheck.violations.map((v, i) => (
+                    <li key={i} style={{
+                      background: 'rgba(239,68,68,0.06)', borderRadius: 6,
+                      padding: '6px 10px', fontSize: 13, color: '#fca5a5',
+                      borderLeft: '3px solid rgba(239,68,68,0.5)'
+                    }}>
+                      ⚠️ {v}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {eligCheck && !eligCheck.checking && eligCheck.eligible && form.officerId && form.trainingProgrammeId && (
+              <div className="alert alert-success">
+                ✅ Officer meets all eligibility requirements for this programme.
+              </div>
+            )}
+
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
               <button
@@ -560,7 +611,9 @@ export default function Nominations() {
                   !form.trainingProgrammeId ||
                   !form.nominatingDepartmentId ||
                   dupCheck?.isDuplicate ||
-                  dupCheck?.checking
+                  dupCheck?.checking ||
+                  eligCheck?.checking ||
+                  (eligCheck && !eligCheck.eligible)
                 }
               >
                 {saving ? 'Submitting…' : willBeWaitlisted ? '📋 Add to Waiting List' : '✅ Confirm Nomination'}

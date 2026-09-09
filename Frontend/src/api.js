@@ -65,3 +65,11 @@ export const nominationApi = {
   cancel:          (id)                     => api.delete(`/nominations/${id}`),
 };
 
+// ── Eligibility (Task 3) ──────────────────────────
+export const eligibilityApi = {
+  check:        (officerId, programmeId) =>
+    api.get('/eligibility/check', { params: { officerId, programmeId } }),
+  getRules:     (programmeId)   => api.get(`/eligibility/rules/${programmeId}`),
+  addRule:      (programmeId, data) => api.post(`/eligibility/rules/${programmeId}`, data),
+  deleteRule:   (ruleId)        => api.delete(`/eligibility/rules/${ruleId}`),
+};

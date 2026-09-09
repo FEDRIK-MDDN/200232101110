@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { programmeApi, departmentApi, nominationApi } from '../api';
+import { useState, useEffect, Fragment } from 'react';
+import { programmeApi, departmentApi, nominationApi, eligibilityApi } from '../api';
 
 export default function Programmes() {
   const [programmes, setProgrammes] = useState([]);
@@ -16,6 +16,13 @@ export default function Programmes() {
   };
   const [form, setForm] = useState(defaultForm);
   const [selectedDeptIds, setSelectedDeptIds] = useState([]);
+
+  // Task 3: Eligibility rules state
+  const [rulesPanel, setRulesPanel] = useState(null); // programmeId whose rules are shown
+  const [rules, setRules] = useState([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [ruleForm, setRuleForm] = useState({ ruleType: 'DEPARTMENT_RESTRICTION', ruleValue: '', description: '' });
+  const [addingRule, setAddingRule] = useState(false);
 
   const load = async () => {
     try {
@@ -42,6 +49,54 @@ export default function Programmes() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Task 3: Load rules for a programme
+  const openRulesPanel = async (progId) => {
+    if (rulesPanel === progId) { setRulesPanel(null); return; }
+    setRulesPanel(progId);
+    setRulesLoading(true);
+    try {
+      const data = await eligibilityApi.getRules(progId);
+      setRules(data || []);
+    } catch (e) {
+      showAlert('danger', 'Could not load eligibility rules.');
+    } finally {
+      setRulesLoading(false);
+    }
+  };
+
+  const handleAddRule = async (progId) => {
+    if (!ruleForm.ruleValue.trim() || !ruleForm.description.trim()) return;
+    setAddingRule(true);
+    try {
+      const newRule = await eligibilityApi.addRule(progId, ruleForm);
+      setRules((prev) => [...prev, newRule]);
+      setRuleForm({ ruleType: 'DEPARTMENT_RESTRICTION', ruleValue: '', description: '' });
+      showAlert('success', 'Eligibility rule added!');
+    } catch (e) {
+      showAlert('danger', e.message);
+    } finally {
+      setAddingRule(false);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId) => {
+    if (!confirm('Delete this eligibility rule?')) return;
+    try {
+      await eligibilityApi.deleteRule(ruleId);
+      setRules((prev) => prev.filter((r) => r.id !== ruleId));
+      showAlert('success', 'Rule deleted.');
+    } catch (e) {
+      showAlert('danger', e.message);
+    }
+  };
+
+  const RULE_TYPES = [
+    { value: 'DEPARTMENT_RESTRICTION', label: '🏢 Department Restriction', hint: 'Enter comma-separated dept IDs, e.g. 1,3,7' },
+    { value: 'GRADE_REQUIREMENT',      label: '🏅 Grade Requirement',      hint: 'Enter required grade, e.g. Grade 3' },
+    { value: 'MIN_YEARS_OF_SERVICE',   label: '📅 Min Years of Service',   hint: 'Enter minimum years, e.g. 5' },
+    { value: 'COOLDOWN_MONTHS',        label: '⏳ Cooldown (months)',         hint: 'Enter number of months, e.g. 12' },
+  ];
 
   const showAlert = (type, msg) => {
     setAlert({ type, msg });
@@ -140,12 +195,14 @@ export default function Programmes() {
                   <th>Trainer</th>
                   <th>Capacity</th>
                   <th>Target Depts</th>
+                  <th>Eligibility Rules</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {programmes.map((p) => (
-                  <tr key={p.id}>
+                {programmes.map((p) => {
+                  return <Fragment key={p.id}>
+                  <tr>
                     <td><strong>{p.title}</strong></td>
                     <td><span className="badge badge-blue">📅 {p.trainingDate}</span></td>
                     <td><span className="text-muted">📍 {p.venue}</span></td>
@@ -199,8 +256,125 @@ export default function Programmes() {
                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>🗑</button>
                       </div>
                     </td>
+                    <td>
+                      <button
+                        className={`btn btn-sm ${rulesPanel === p.id ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => openRulesPanel(p.id)}
+                        title="Manage eligibility rules"
+                      >
+                        🛡️ Rules
+                      </button>
+                    </td>
                   </tr>
-                ))}
+                  {/* Inline eligibility rules panel */}
+                  {rulesPanel === p.id && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 0, background: 'rgba(79,70,229,0.04)' }}>
+                        <div style={{
+                          padding: '16px 20px',
+                          borderTop: '1px solid rgba(79,70,229,0.2)',
+                          borderBottom: '1px solid rgba(79,70,229,0.2)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                            <span style={{ fontSize: 18 }}>🛡️</span>
+                            <span style={{ fontWeight: 700, fontSize: 14 }}>Eligibility Rules — {p.title}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>
+                              (Task 3: Officers must pass all rules to be nominated)
+                            </span>
+                          </div>
+
+                          {rulesLoading ? (
+                            <div className="spinner" style={{ margin: '10px auto', width: 24, height: 24 }} />
+                          ) : (
+                            <>
+                              {/* Existing rules */}
+                              {rules.length === 0 ? (
+                                <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 14 }}>
+                                  ℹ️ No eligibility rules configured. All officers can be nominated.
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                                  {rules.map((r) => (
+                                    <div key={r.id} style={{
+                                      display: 'flex', alignItems: 'center', gap: 10,
+                                      background: 'var(--bg)', borderRadius: 8,
+                                      padding: '8px 12px', border: '1px solid var(--border)'
+                                    }}>
+                                      <span className="badge badge-blue" style={{ whiteSpace: 'nowrap' }}>
+                                        {RULE_TYPES.find((t) => t.value === r.ruleType)?.label || r.ruleType}
+                                      </span>
+                                      <span style={{ fontSize: 13, flex: 1 }}>{r.description}</span>
+                                      <span className="badge badge-orange" style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{r.ruleValue}</span>
+                                      <button
+                                        className="btn btn-danger btn-sm"
+                                        onClick={() => handleDeleteRule(r.id)}
+                                        style={{ padding: '4px 8px' }}
+                                      >
+                                        🗑
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Add new rule form */}
+                              <div style={{
+                                background: 'var(--bg-card2)', borderRadius: 10,
+                                padding: '12px 14px', border: '1px solid var(--border)'
+                              }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  ➕ Add New Rule
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: 10, alignItems: 'end' }}>
+                                  <div>
+                                    <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Rule Type</label>
+                                    <select
+                                      value={ruleForm.ruleType}
+                                      onChange={(e) => setRuleForm({ ...ruleForm, ruleType: e.target.value })}
+                                    >
+                                      {RULE_TYPES.map((t) => (
+                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>
+                                      Value
+                                      <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--accent)', fontStyle: 'italic' }}>
+                                        {RULE_TYPES.find((t) => t.value === ruleForm.ruleType)?.hint}
+                                      </span>
+                                    </label>
+                                    <input
+                                      value={ruleForm.ruleValue}
+                                      onChange={(e) => setRuleForm({ ...ruleForm, ruleValue: e.target.value })}
+                                      placeholder="Rule value"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Description (shown to users)</label>
+                                    <input
+                                      value={ruleForm.description}
+                                      onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
+                                      placeholder="e.g. Finance, Budget or Planning officers only"
+                                    />
+                                  </div>
+                                  <button
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => handleAddRule(p.id)}
+                                    disabled={addingRule || !ruleForm.ruleValue.trim() || !ruleForm.description.trim()}
+                                  >
+                                    {addingRule ? '…' : 'Add'}
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>;
+                })}
               </tbody>
             </table>
           </div>

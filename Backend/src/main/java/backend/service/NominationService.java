@@ -2,7 +2,9 @@ package backend.service;
 
 import backend.dto.NominationRequestDTO;
 import backend.dto.NominationResponseDTO;
+import backend.dto.EligibilityResult;
 import backend.exception.DuplicateNominationException;
+import backend.exception.IneligibleOfficerException;
 import backend.exception.ResourceNotFoundException;
 import backend.model.Department;
 import backend.model.Nomination;
@@ -28,6 +30,7 @@ public class NominationService {
     private final OfficerRepository officerRepository;
     private final TrainingProgrammeRepository trainingProgrammeRepository;
     private final DepartmentRepository departmentRepository;
+    private final EligibilityService eligibilityService;
 
     /**
      * Submit a new nomination.
@@ -57,6 +60,14 @@ public class NominationService {
                 officer.getId(), programme.getId());
         if (isDuplicate) {
             throw new DuplicateNominationException(officer.getFullName(), programme.getTitle());
+        }
+
+        // 5. ELIGIBILITY CHECK (Task 3) — evaluate all active rules for this programme
+        EligibilityResult eligibility = eligibilityService.checkEligibility(
+                officer.getId(), programme.getId());
+        if (!eligibility.isEligible()) {
+            throw new IneligibleOfficerException(
+                    officer.getFullName(), programme.getTitle(), eligibility.getViolations());
         }
 
         // 5. Determine status based on current CONFIRMED count vs capacity

@@ -12,7 +12,8 @@ export default function Officers() {
   const [search, setSearch] = useState('');
 
   const [form, setForm] = useState({
-    employeeId: '', fullName: '', email: '', department: { id: '' }
+    employeeId: '', fullName: '', email: '', department: { id: '' },
+    grade: '', yearsOfService: ''
   });
 
   // Validation
@@ -81,7 +82,7 @@ export default function Officers() {
 
   const openCreate = () => {
     setEditOfficer(null);
-    setForm({ employeeId: '', fullName: '', email: '', department: { id: '' } });
+    setForm({ employeeId: '', fullName: '', email: '', department: { id: '' }, grade: '', yearsOfService: '' });
     setErrors({});
     setTouched({});
     setShowModal(true);
@@ -93,7 +94,9 @@ export default function Officers() {
       employeeId: o.employeeId,
       fullName: o.fullName,
       email: o.email || '',
-      department: { id: o.department?.id || '' }
+      department: { id: o.department?.id || '' },
+      grade: o.grade || '',
+      yearsOfService: o.yearsOfService ?? '',
     });
     setErrors({});
     setTouched({});
@@ -111,7 +114,9 @@ export default function Officers() {
     try {
       const payload = {
         ...form,
-        department: form.department.id ? { id: Number(form.department.id) } : null
+        department: form.department.id ? { id: Number(form.department.id) } : null,
+        yearsOfService: form.yearsOfService !== '' ? Number(form.yearsOfService) : null,
+        grade: form.grade.trim() || null,
       };
       if (editOfficer) {
         await officerApi.update(editOfficer.id, payload);
@@ -183,31 +188,43 @@ export default function Officers() {
             <table>
               <thead>
                 <tr>
-                  <th>Employee ID</th>
-                  <th>Full Name</th>
-                  <th>Department</th>
-                  <th>Email</th>
-                  <th>Actions</th>
-                </tr>
+                   <th>Employee ID</th>
+                   <th>Full Name</th>
+                   <th>Department</th>
+                   <th>Grade</th>
+                   <th>Years of Service</th>
+                   <th>Email</th>
+                   <th>Actions</th>
+                 </tr>
               </thead>
               <tbody>
                 {filtered.map((o) => (
-                  <tr key={o.id}>
-                    <td><span className="badge badge-blue">{o.employeeId}</span></td>
-                    <td><strong>{o.fullName}</strong></td>
-                    <td>
-                      {o.department
-                        ? <span className="badge badge-orange">🏢 {o.department.name}</span>
-                        : <span className="text-muted">—</span>}
-                    </td>
-                    <td><span className="text-muted">{o.email || '—'}</span></td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="btn btn-ghost btn-sm" onClick={() => openEdit(o)}>✏️ Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
+                   <tr key={o.id}>
+                     <td><span className="badge badge-blue">{o.employeeId}</span></td>
+                     <td><strong>{o.fullName}</strong></td>
+                     <td>
+                       {o.department
+                         ? <span className="badge badge-orange">🏢 {o.department.name}</span>
+                         : <span className="text-muted">—</span>}
+                     </td>
+                     <td>
+                       {o.grade
+                         ? <span className="badge badge-blue">{o.grade}</span>
+                         : <span className="text-muted">—</span>}
+                     </td>
+                     <td>
+                       {o.yearsOfService != null
+                         ? <span className="badge badge-green">{o.yearsOfService} yrs</span>
+                         : <span className="text-muted">—</span>}
+                     </td>
+                     <td><span className="text-muted">{o.email || '—'}</span></td>
+                     <td>
+                       <div className="flex gap-2">
+                         <button className="btn btn-ghost btn-sm" onClick={() => openEdit(o)}>✏️ Edit</button>
+                         <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑</button>
+                       </div>
+                     </td>
+                   </tr>
                 ))}
               </tbody>
             </table>
@@ -272,6 +289,26 @@ export default function Officers() {
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Grade / Designation <span style={{ fontSize: 10, color: 'var(--accent)' }}>(Task 3)</span></label>
+                <input
+                  id="officer-grade"
+                  value={form.grade}
+                  onChange={(e) => handleChange('grade', e.target.value)}
+                  placeholder="e.g. Grade 3, Senior Executive"
+                />
+              </div>
+              <div className="form-group">
+                <label>Years of Service <span style={{ fontSize: 10, color: 'var(--accent)' }}>(Task 3)</span></label>
+                <input
+                  id="officer-years"
+                  type="number"
+                  min="0"
+                  value={form.yearsOfService}
+                  onChange={(e) => handleChange('yearsOfService', e.target.value)}
+                  placeholder="e.g. 5"
+                />
               </div>
             </div>
             <div className="modal-footer">
